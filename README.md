@@ -8,8 +8,4 @@ AND Heikin Ashi low > Parabolic SAR,
 AND Heikin Ashi low >= Heikin Ashi close, 
 AND if at least last 3 of last 5 candles close price < open price
 
-Execute SELL order if Heikin Ashi open > close, 
-AND Heikin Ashi high < EMA, 
-AND Heikin Ashi high < Parabolic SAR, 
-AND Heikin Ashi high <= Heikin Ashi open, 
-AND if at least last 3 of 5 candles close price > open price
+Sell order is still a WIP
