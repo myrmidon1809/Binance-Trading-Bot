@@ -1,4 +1,4 @@
-# Binance-Trading-Bot
+# Binance-Trading-Bot (WIP)
 Bot created to trade cryptocurrencies on the Binance platform
 
 Currently set to trade XRP/AUD based on the following indicators:
