@@ -1,0 +1,84 @@
+import pandas as pd
+import pandas_ta as ta
+import ccxt
+import time
+import numpy as np
+import ha
+import schedule
+
+from pandas.core.frame import DataFrame
+from pandas_ta.overlap import ema
+from pandas_ta.trend import psar
+from datetime import datetime
+from ha import ha
+
+exchange = ccxt.binance({   ### Enter exchange here
+    "apiKey": '',   ### Enter private API details here
+    "secret": ''
+})
+
+
+def bot():
+    AUD_Free = exchange.fetch_balance()['free']['AUD']  ### Find relevant FIAT balance. Change AUD to your currency code
+    XRP_Free = exchange.fetch_balance()['free']['XRP']  ### Find relevant cryptocurrency balance. Change XRP to cryptocurrency you want to trade
+    
+    bars = exchange.fetch_ohlcv('XRP/AUD', timeframe='5m')  ### Retrieve Open, High, Low, Close data. Change timeframe and currency pairing to suit your needs
+
+    df = pd.DataFrame(bars, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    
+    ### Technical Indicators defined
+    EMA = ema(close=df['close'], length=200)    ### Exponential Moving Average definition from pandas_ta. Change period to suit your needs
+    PSAR = psar(high=df['high'],low=df['low'])  ### Parabolic Stop and Reverse indicator from pandas_ta
+    Heikin_Ashi = ha(open = df['open'], high = df['high'], low = df['low'], close = df['close'])    ### Heikin Ashi Candles defined as per pandas_ta fork
+    
+    ### Indicator Parameters to add to dataframe
+    df['EMA'] = EMA
+    df['EMA_Buy_Parameter'] = np.where(Heikin_Ashi['ha_low'] > df['EMA'], True, False)
+    df['EMA_Sell_Parameter'] = np.where(Heikin_Ashi['ha_high'] < df['EMA'], True, False)
+    df['Candle_Colour'] = np.where(Heikin_Ashi['ha_close'] > Heikin_Ashi['ha_open'], "Green", "Red")
+    df['Low_Tail_Parameter'] = np.where(Heikin_Ashi['ha_low'] < Heikin_Ashi['ha_close'], True, False)
+    df['High_Tail_Parameter'] = np.where(Heikin_Ashi['ha_high'] > Heikin_Ashi['ha_close'], True, False)
+    df['Buy_PSAR_Parameter'] = np.where(Heikin_Ashi['ha_low'] > PSAR['PSARl_0.02_0.2'], True, False)
+    df['Sell_PSAR_Parameter'] = np.where(Heikin_Ashi['ha_high'] < PSAR['PSARs_0.02_0.2'], True, False)
+    df['3_Red_Candles'] = np.where(((df['Candle_Colour'].shift(1) == "Red") & (df['Candle_Colour'].shift(2) == "Red") & (df['Candle_Colour'].shift(3) == "Red")), True, False)
+    df['3_Red_Candles_Shift'] = np.where(((df['Candle_Colour'].shift(2) == "Red") & (df['Candle_Colour'].shift(3) == "Red") & (df['Candle_Colour'].shift(4) == "Red")), True, False)
+    df['3_Green_Candles'] = np.where(((df['Candle_Colour'].shift(1) == "Green") & (df['Candle_Colour'].shift(2) == "Green") & (df['Candle_Colour'].shift(3) == "Green")), True, False)
+    df['3_Green_Candles_Shift'] = np.where(((df['Candle_Colour'].shift(2) == "Green") & (df['Candle_Colour'].shift(3) == "Green") & (df['Candle_Colour'].shift(4) == "Green")), True, False)
+    df['Buy_Conditions_Met'] = np.where((df['EMA_Buy_Parameter'] == True) & (df['Candle_Colour'] == "Green") & (df['Low_Tail_Parameter'] == True) & (df['Buy_PSAR_Parameter'] == True) & (df['3_Red_Candles'] == True), "Yes", 
+    np.where((df['EMA_Buy_Parameter'] == True) & (df['Candle_Colour'] == "Green") & (df['Candle_Colour'].shift(1) == "Green") & (df['Low_Tail_Parameter'] == True) & (df['Buy_PSAR_Parameter'] == True) & (df['3_Red_Candles'] == True) & (df['3_Red_Candles_Shift'] == True), "Yes","No"))
+    df['Sell_Conditions_Met'] = np.where((df['EMA_Sell_Parameter'] == True) & (df['Candle_Colour'] == "Red") & (df['High_Tail_Parameter'] == True) & (df['Sell_PSAR_Parameter'] == True) & (df['3_Green_Candles'] == True), "Yes",
+    np.where((df['EMA_Sell_Parameter'] == True) & (df['Candle_Colour'] == "Red") & (df['Candle_Colour'].shift(1) == "Red") & (df['High_Tail_Parameter'] == True) & (df['Sell_PSAR_Parameter'] == True) & (df['3_Green_Candles'] == True) & (df['3_Green_Candles_Shift'] == True), "Yes", "No" ))
+
+    result = pd.concat([df,Heikin_Ashi,PSAR],axis=1,join='inner')   ### New dataframe created containing all results
+    result.to_csv("Output.csv")
+    
+    in_position = False ###Set whether we are already in a position
+
+    ### Define Buy and Sell Signals
+    print("checking for buy and sell signals")
+    last_row_index = len(df.index) - 1
+    
+    if df['Buy_Conditions_Met'][last_row_index] is "Yes":
+        print("All conditions met, buy")
+    if not in_position:
+        order = exchange.create_market_buy_order(symbol = 'XRP/AUD', amount = AUD_Free)
+        print(order)
+        in_position = True
+    else:
+        print("Already in position")
+    
+    if df['Sell_Conditions_Met'][last_row_index] is "Yes":  ### Sell is still a work in progress
+        if in_position:
+            print("All conditions me, sell")
+            order = exchange.create_market_sell_order(symbol = 'XRP/AUD', amount = XRP_Free)
+            print(order)
+            in_position = False
+        else:
+            print("Not in position")
+    
+schedule.every(5).minutes.do(bot)   #Schedule how often the bot should run
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
