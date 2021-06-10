@@ -4,3 +4,4 @@ ccxt
 time
 numpy
 ha
+schedule
