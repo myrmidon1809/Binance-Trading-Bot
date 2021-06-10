@@ -1,6 +1,8 @@
 # Binance-Trading-Bot (WIP)
 Bot created to trade cryptocurrencies on the Binance platform
 
+Accesse the Binance Exchange through CCXT (https://github.com/ccxt/ccxt)
+
 Currently set to trade XRP/AUD based on the following indicators:
 Execute BUY order if Heikin Ashi close > Heikin Ashi open, 
 AND Heikin Ashi low > EMA, 
