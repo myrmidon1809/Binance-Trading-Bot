@@ -8,4 +8,4 @@ AND Heikin Ashi low > Parabolic SAR,
 AND Heikin Ashi low >= Heikin Ashi close, 
 AND if at least last 3 of last 5 candles close price < open price
 
-Sell order is still a WIP
+Sell order is still a work in progress
