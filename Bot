@@ -22,13 +22,17 @@ def bot():
     AUD_Free = exchange.fetch_balance()['free']['AUD']  ### Find relevant FIAT balance. Change AUD to your currency code
     XRP_Free = exchange.fetch_balance()['free']['XRP']  ### Find relevant cryptocurrency balance. Change XRP to cryptocurrency you want to trade
     
+    print("Bot Running")
+    print(AUD_Free)
+    print(XRP_Free)
+
     bars = exchange.fetch_ohlcv('XRP/AUD', timeframe='5m')  ### Retrieve Open, High, Low, Close data. Change timeframe and currency pairing to suit your needs
 
     df = pd.DataFrame(bars, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     
     ### Technical Indicators defined
-    EMA = ema(close=df['close'], length=200)    ### Exponential Moving Average definition from pandas_ta. Change period to suit your needs
+    EMA = ema(close=df['close'], length=50)    ### Exponential Moving Average definition from pandas_ta. Change period to suit your needs
     PSAR = psar(high=df['high'],low=df['low'])  ### Parabolic Stop and Reverse indicator from pandas_ta
     Heikin_Ashi = ha(open = df['open'], high = df['high'], low = df['low'], close = df['close'])    ### Heikin Ashi Candles defined as per pandas_ta fork
     
@@ -59,19 +63,20 @@ def bot():
     print("checking for buy and sell signals")
     last_row_index = len(df.index) - 1
     
-    if df['Buy_Conditions_Met'][last_row_index] is "Yes":
+    if df['Buy_Conditions_Met'][last_row_index] == "Yes":
         print("All conditions met, buy")
-    if not in_position:
-        order = exchange.create_market_buy_order(symbol = 'XRP/AUD', amount = AUD_Free)
-        print(order)
-        in_position = True
-    else:
-        print("Already in position")
+        print(df.tail(5))
+        if not in_position:
+            order = exchange.create_market_buy_order(symbol = 'XRP/AUD', amount = (AUD_Free - 1))
+            print(order)
+            in_position = True
+        else:
+            print("Already in position")
     
-    if df['Sell_Conditions_Met'][last_row_index] is "Yes":  ### Sell is still a work in progress
+    if df['Sell_Conditions_Met'][last_row_index] == "Yes":  ### Sell is still a work in progress
         if in_position:
             print("All conditions me, sell")
-            order = exchange.create_market_sell_order(symbol = 'XRP/AUD', amount = XRP_Free)
+            order = exchange.create_market_sell_order(symbol = 'XRP/AUD', amount = (XRP_Free - 1))
             print(order)
             in_position = False
         else:
